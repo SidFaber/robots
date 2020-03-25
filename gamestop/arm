@@ -1,0 +1,93 @@
+#! /bin/bash
+usage() {
+    echo "Usage: $0 verb
+
+Verbs:
+  circle   Draw a circle
+  close    Close the gripper
+  help     This message
+  home     Go to home position
+  lock     Locks the arm servos
+  neutral  Go to neutral position
+  open     Open the gripper
+  unlock   Unlocks the arm servos
+"
+}
+
+# source the environment if it hasn't already been
+if [ -z "ROS_VERSION" ]
+then
+    source ~/ros2/robotis_ws/install/setup.bash
+fi
+
+if [ -z "$1" ]
+then
+    usage
+    exit 0
+fi
+
+case "$1" in
+    "circle")
+        ros2 service call \
+             '/open_manipulator_x/goal_drawing_trajectory' \
+             'open_manipulator_msgs/srv/SetDrawingTrajectory' \
+             '{ end_effector_name: "gripper", 
+                drawing_trajectory_name: "circle",
+                path_time: 5.0,
+                param: [0.03, 1.0, 0 ]
+              }'
+    ;;
+    
+    "close" )
+        ros2 service call \
+             '/open_manipulator_x/goal_tool_control' \
+             'open_manipulator_msgs/srv/SetJointPosition' \
+             '{ joint_position: { joint_name: ["gripper"], position: [-0.01] } }'
+    ;;
+    
+    "help" )
+        usage
+    ;;
+    
+    "home" )
+        ros2 service call \
+             '/open_manipulator_x/goal_task_space_path' \
+             'open_manipulator_msgs/srv/SetKinematicsPose' \
+             '{end_effector_name: "gripper", path_time: 3.0,
+             kinematics_pose: {pose: {position: {x: 0.1356, y: 0.0000, z: 0.2363}}}}'
+    ;;
+    
+    "lock" )
+        ros2 service call \
+             '/open_manipulator_x/set_actuator_state' \
+             'open_manipulator_msgs/srv/SetActuatorState' \
+             "{ set_actuator_state: true }"
+    ;;
+    "neutral" )
+        ros2 service call \
+             '/open_manipulator_x/goal_task_space_path' \
+             'open_manipulator_msgs/srv/SetKinematicsPose' \
+             '{end_effector_name: "gripper", path_time: 3.0,
+             kinematics_pose: {pose: {position: {x: 0.0, y: 0.0, z: 0.0 }}}}'
+    
+    ;;
+    "open" )
+        ros2 service call \
+             '/open_manipulator_x/goal_tool_control' \
+             'open_manipulator_msgs/srv/SetJointPosition' \
+             '{ joint_position: { joint_name: ["gripper"], position: [0.01] } }'
+    ;;
+    "unlock" )
+        ros2 service call \
+             '/open_manipulator_x/set_actuator_state' \
+             'open_manipulator_msgs/srv/SetActuatorState' \
+             "{ set_actuator_state: false }"
+    ;;
+
+    * )
+        echo "ERROR: '$1' not recognized.\n"
+        usage
+esac
+
+    
+            
