@@ -30,14 +30,14 @@ This tutorial applies to ROS Dashing and the OpenManipulatorX robot arm.
 Discover Services
 =================
 Launch your robot according to the manufacturer's instructions.
-.. code-block:: bash
+::
 
   cd robotis_ws
   source install/setup.bash
   ros2 launch open_manipulator_x_controller open_manipulator_x_controller.launch.py
 
 Use the ``ros2 service list`` command to list the services provided by your robot:
-.. code-block:: bash
+::
 
   ubuntu@ros2:~/robotis_ws$ ros2 service list
   /launch_ros/describe_parameters
@@ -50,7 +50,7 @@ Use the ``ros2 service list`` command to list the services provided by your robo
   /open_manipulator_x/goal_joint_space_path
   ...
 This is a long list.  However, ROS 2 implements parameters as services within each node, so there are six services attached to each node by default.  If we filter out those services, we get a much smaller list and can group them by function (spacing added for readability):  
-.. code-block:: bash
+::
 
   ubuntu@ros2:~/robotis_ws$ ros2 service list|grep -v parameter
   /open_manipulator_x/goal_drawing_trajectory
@@ -75,7 +75,7 @@ This is a long list.  However, ROS 2 implements parameters as services within ea
 Combined with the `documentation for the robot<http://emanual.robotis.com/docs/en/platform/openmanipulator_x/ros2_controller_package/#service-server-list>`, we get a brief understanding of these services.  We'll initially target the set_actuator_state service to lock and unlock the servos on the arm.
 
 Use ros2 service list -t to get the service type definition information from the service:
-.. code-block:: bash
+::
 
   ubuntu@ros2:~/robotis_ws$ ros2 service list -t | grep -v parameter
   ...
@@ -98,7 +98,7 @@ In order to interact with a service, messages must be sent and received accordin
   ros2 service list shows all the services currently active in your ROS domain.  ros2 srv list shows all the services recognized and configured for your client to use.  A service may be installed but not currently in use, and a service may be in use by another node on another computer but not recognizable or configured properly on your workstation.
 
 Use ros2 srv show to find both the request message type and the response message type:
-.. code-block:: bash
+::
 
   ubuntu@ros2:~/robotis_ws$ ros2 srv show open_manipulator_msgs/srv/SetActuatorState
   bool set_actuator_state
@@ -115,7 +115,7 @@ Use the set_actuator_state service to lock and unlock the arm.
 Services are used through the ros2 service call command.  The command requires a service name and type (defined above) and the values required by the interface.  Values are all stored in `YAML format <https://yaml.org/>`.
 
 In order to unlock the robot arm, we need to send the set_actuator_state service a YAML message containing a single variable set_actuator_state set to false.  From a bash prompt that looks like this:
-.. code-block:: bash
+::
 
   ubuntu@ros2:~/robotis_ws$ ros2 service call \ '/open_manipulator_x/set_actuator_state' \ 'open_manipulator_msgs/srv/SetActuatorState' \
     "{ set_actuator_state: false }"
@@ -158,7 +158,8 @@ Request YAML format:
 The request message is more complex.  planning_group and path_time are built-in types, but the variable joint_position is a message of type JointPosition.
 
 Message types are also defined in the ROS 2 interface documentation, and consist of either built-in types or other message types.  In order to find the definition for the JointPosition message, use ros2 msg show:
-.. code-block:bash
+::
+
 
   ubuntu@ros2:~/robotis_ws$ ros2 msg show open_manipulator_msgs/msg/JointPosition
   string[]   joint_name
@@ -183,7 +184,7 @@ Joint_name and position are array arguments which represent each joint to be con
 After consulting the robot's documentation to understand the fields, we have enough information to send this service a message.  For this robot arm the planning_group, path_time and scaling_factor variables are related to MoveIt! motion planning and can be ignored.  Joint names are "gripper" and "joint1" through "joint4" (the arm axes).  Each joint has defined limits; the "gripper" joint is variable between -0.01 (closed) and 0.01 (open).  All measurements are in meters, and all angles are in radians.
 
 The service call to open the joint is as follows:
-.. code-block:bash
+::
 
   ros2 service call \
       '/open_manipulator_x/goal_tool_control' \
@@ -200,7 +201,7 @@ The service call to open the joint is as follows:
   }'
 
 Or, removing the unnecessary variables and simplify:
-.. code-block:bash
+::
 
   ros2 service call \
     '/open_manipulator_x/goal_tool_control' \
@@ -212,7 +213,7 @@ Or, removing the unnecessary variables and simplify:
 Move to a Point in Space
 ========================
 Explore the goal_task_space service the robot end effector (the gripper) to a specific (x, y, z) position in space using the SetKinematicsPose interface.
-.. code-block:bash
+::
 
   ubuntu@ros2:~/robotis_ws$ ros2 srv show open_manipulator_msgs/srv/SetKinematicsPose
   string planning_group
@@ -255,7 +256,7 @@ Explore the goal_task_space service the robot end effector (the gripper) to a sp
   float64 w
 
 The following service call will move the robot arm to position (x=0, y=0, z=0):
-.. code-block:bash
+::
 
   ros2 service call \
     '/open_manipulator_x/goal_task_space_path' \
@@ -285,7 +286,7 @@ The following service call will move the robot arm to position (x=0, y=0, z=0):
       }'
 
 Again removing the unnecessary arguments to simplify:
-.. code-block:bash
+::
 
   ros2 service call \
     '/open_manipulator_x/goal_task_space_path' \
@@ -298,7 +299,7 @@ Draw a Circle
 =============
 
 Use /open_manipulator_x/goal_drawing_trajectory, interface type [open_manipulator_msgs/srv/SetDrawingTrajectory]
-.. code-block:bash
+::
 
   ros2 srv show open_manipulator_msgs/srv/SetDrawingTrajectory
   string end_effector_name
@@ -309,7 +310,7 @@ Use /open_manipulator_x/goal_drawing_trajectory, interface type [open_manipulato
   bool is_planned
 
 The trajectory name "circle" requires three parameters:  the radius of the circle in meters, the number of revolutions (1.0 is a full 360 degrees) and the start angle of the circle in radians.  The following call draws a circle of radius 3cm two times:
-.. code-block:bash
+::
 
   ros2 service call \
     '/open_manipulator_x/goal_drawing_trajectory' \
@@ -325,7 +326,7 @@ The trajectory name "circle" requires three parameters:  the radius of the circl
 Conclusion!
 ===========
 Congratulations! You're now able to control your robot to run some straight forward tasks without having to compile and run code. Your next step might be to create a simple shell script to run commands.  Here's a simple example:
-.. code-block: bash
+::
 
   #! /bin/bash
   usage() {
