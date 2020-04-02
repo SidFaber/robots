@@ -7,7 +7,7 @@ Overview
 ========
 
 Services within the Robot Operating System (ROS) ROS services control robot behavior.
-There's plenty of documentation on how to `create and use services<https://index.ros.org/doc/ros2/Tutorials/Services/Understanding-ROS2-Services/>`.
+There's plenty of documentation on how to `create and use services <https://index.ros.org/doc/ros2/Tutorials/Services/Understanding-ROS2-Services/>`_.
 This complements other tutorials by specfically focusing on getting started without code.
 The service interface continues to evolve as ROS 2 matures, so be sure to work with the right version.
 
@@ -72,7 +72,7 @@ This is a long list.  However, ROS 2 implements parameters as services within ea
 
   /open_manipulator_x/set_actuator_state
 
-Combined with the `documentation for the robot<http://emanual.robotis.com/docs/en/platform/openmanipulator_x/ros2_controller_package/#service-server-list>`, we get a brief understanding of these services.  We'll initially target the set_actuator_state service to lock and unlock the servos on the arm.
+Combined with the `documentation for the robot <http://emanual.robotis.com/docs/en/platform/openmanipulator_x/ros2_controller_package/#service-server-list>`_, we get a brief understanding of these services.  We'll initially target the set_actuator_state service to lock and unlock the servos on the arm.
 
 Use ros2 service list -t to get the service type definition information from the service:
 ::
@@ -105,14 +105,14 @@ Use ros2 srv show to find both the request message type and the response message
   ---
   bool is_planned
 
-This output follows the interface definition language used for .srv service files.  For more see the `ROS2 documentation<https://index.ros.org/doc/ros2/Concepts/About-ROS-Interfaces/>`.   This service is pretty simple:  a boolean value of true or false.
+This output follows the interface definition language used for .srv service files.  For more see the `ROS2 documentation <https://index.ros.org/doc/ros2/Concepts/About-ROS-Interfaces/>`_.   This service is pretty simple:  a boolean value of true or false.
 
 
 Craft a Simple Message
 ======================
 Use the set_actuator_state service to lock and unlock the arm.
 
-Services are used through the ros2 service call command.  The command requires a service name and type (defined above) and the values required by the interface.  Values are all stored in `YAML format <https://yaml.org/>`.
+Services are used through the ros2 service call command.  The command requires a service name and type (defined above) and the values required by the interface.  Values are all stored in `YAML format <https://yaml.org/>`_.
 
 In order to unlock the robot arm, we need to send the set_actuator_state service a YAML message containing a single variable set_actuator_state set to false.  From a bash prompt that looks like this:
 ::
