@@ -7,6 +7,7 @@
 
 
 from svgpathtools import svg2paths, wsvg
+from math import sqrt
 
 class SvgDrawing:
     """A drawing parsed from an svg file"""
@@ -18,6 +19,10 @@ class SvgDrawing:
         self.maxX = None
         self.maxY = None
         self.file = None
+        # resolution is the number of steps it takes to go from
+        # upper left to bottom right of the drawing
+        self.resolution = 100
+        self.stepsize = None
 
     def loadFile (self, file):
         """Load an svg file and transform into point paths
@@ -31,39 +36,63 @@ class SvgDrawing:
 
         svgpaths, svgattributes = svg2paths(file)
 
+        self.setMaxMin (svgpaths)
+
         for p in svgpaths:
             self.addPath (p)
 
-
-    def addPath (self, svgPath):
-        """Add an SVG path
+    def setMaxMin (self, svgPaths):
+        """Find the bounding box of the svg path
 
         Args:
-            svgPath (Path): A path object from the svgpathtools library
+            svgPaths (Path): An iterable array of path objects from the svgpathtools library
+        """
+
+        for p in svgPaths:
+            minX, maxX, minY, maxY = p.bbox()
+            if self.minX is None:
+                self.minX = minX
+            else:
+                self.minX = min (self.minX, minX)
+
+            if self.maxX is None:
+                self.maxX = maxX
+            else:
+                self.maxX = max (self.maxX, maxX)
+
+            if self.minY is None:
+                self.minY = minY
+            else:
+                self.minY = min (self.minY, minY)
+
+            if self.maxY is None:
+                self.maxY = maxY
+            else:
+                self.maxY = max (self.maxY, maxY)
+
+        self.stepsize = sqrt ((self.maxX - self.minX) ** 2 + (self.maxY - self.minY) ** 2) / self.resolution
+
+    def addPath (self, path):
+        """Add an SVG path.  Only call after the bounding box is set.
+
+        Args:
+            path (Path): A path object from the svgpathtools library
         """
         #  get the starting point for this path
-        x = svgPath.start.real
-        y = svgPath.start.imag
-        if self.minX is None:
-            self.minX = x
-        if self.maxX is None:
-            self.maxX = x
-        if self.minY is None:
-            self.minY = y
-        if self.maxY is None:
-            self.maxY = y
+        x = path.start.real
+        y = path.start.imag
 
         mypath = SvgPath(x, y)
 
-        for segment in svgPath:
+        for segment in path:
+            steps = int (segment.length(error=1e-5) / self.stepsize)
+            for step in range (1, steps):
+                pt = segment.point(step/steps)
+                mypath.addPoint (pt.real, pt.imag)
             mypath.addPoint (segment.end.real, segment.end.imag)
 
         self.paths.append(mypath)
 
-        self.minX = min (self.minX, mypath.minX)
-        self.minY = min (self.minY, mypath.minY)
-        self.maxX = max (self.maxX, mypath.maxY)
-        self.maxY = max (self.maxY, mypath.maxY)
 
     def resize (self, canvasMinX, canvasMinY, canvasMaxX, canvasMaxY):
         """Resize a drawing to fit a canvas
@@ -158,7 +187,8 @@ class SvgPath:
 
 def main():
     dwg = SvgDrawing()
-    dwg.loadFile ("/home/sid/robots_ws/src/robots/gamestop/res/svg/duck.svg")
+    #dwg.loadFile ("/home/sid/robots_ws/src/robots/gamestop/res/svg/duck.svg")
+    dwg.loadFile ("/home/sid/robots_ws/src/robots/gamestop/res/svg/ubuntu.svg")
     dwg.resize (0.1500, -0.0700, 0.2500, 0.0700)
     for path in dwg.paths:
         for (x,y) in path.points:
@@ -167,9 +197,9 @@ def main():
 ros2 service call \
     '/open_manipulator_x/goal_task_space_path' \
     'open_manipulator_msgs/srv/SetKinematicsPose' \
-    '{end_effector_name: "gripper", path_time: 0.3,
+    '{end_effector_name: "gripper", path_time: 0.15,
     kinematics_pose: {pose: {position: {x: %f, y: %f, z: 0.1}}}}'
-sleep 0.3
+sleep 0.15
         """ % (x,y))
 
 
