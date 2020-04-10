@@ -15,8 +15,9 @@ Verbs:
 }
 
 # source the environment if it hasn't already been
-if [ -z "ROS_VERSION" ]
+if [ -z "$ROS_VERSION" ]
 then
+    echo "sourcing..."
     source ~/ros2/robotis_ws/install/setup.bash
 fi
 
@@ -83,7 +84,11 @@ case "$1" in
              'open_manipulator_msgs/srv/SetActuatorState' \
              "{ set_actuator_state: false }"
     ;;
-
+    "launch" )
+        cd ~/ros2/robotis_ws
+        source install/setup.bash
+        ros2 launch open_manipulator_x_controller open_manipulator_x_controller.launch.py
+    ;;
     * )
         echo "ERROR: '$1' not recognized.\n"
         usage
