@@ -7,9 +7,11 @@ Verbs:
   close    Close the gripper
   help     This message
   home     Go to home position
+  launch   Launch the robot arm
   lock     Locks the arm servos
   neutral  Go to neutral position
   open     Open the gripper
+  reset    Move the servos to a good spot
   unlock   Unlocks the arm servos
 "
 }
@@ -57,7 +59,6 @@ case "$1" in
              '{end_effector_name: "gripper", path_time: 3.0,
              kinematics_pose: {pose: {position: {x: 0.1356, y: 0.0000, z: 0.2363}}}}'
     ;;
-    
     "lock" )
         ros2 service call \
              '/open_manipulator_x/set_actuator_state' \
@@ -84,9 +85,13 @@ case "$1" in
              'open_manipulator_msgs/srv/SetActuatorState' \
              "{ set_actuator_state: false }"
     ;;
+    "reset" )
+        ros2 service call \
+             '/open_manipulator_x/goal_joint_space_path' \
+             'open_manipulator_msgs/srv/SetJointPosition' \
+             '{ path_time: 5.0, joint_position: { joint_name: ["joint1", "joint2", "joint3", "joint4"], position: [-0.3000, -0.7500, +0.8750, -0.1500] } }'
+    ;;
     "launch" )
-        cd ~/ros2/robotis_ws
-        source install/setup.bash
         ros2 launch open_manipulator_x_controller open_manipulator_x_controller.launch.py
     ;;
     * )
