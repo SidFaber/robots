@@ -324,7 +324,6 @@ Actuator State: %s
         self.move_future = self.move_task_space_service.call_async (self.move_request)
         rclpy.spin_until_future_complete(self, self.move_future)
         self.wait_for_move_torqued()
-        self.move_future.cancel()
 
         # back off
         self.targetx = self.x
@@ -338,7 +337,7 @@ Actuator State: %s
         self.move_future = self.move_task_space_service.call_async (self.move_request)
         rclpy.spin_until_future_complete(self, self.move_future)
         self.wait_for_move_untorqued()
-        self.move_future.cancel()
+        time.sleep (0.5)    # let the arm settle
 
 
     def record_height (self, x, y):
