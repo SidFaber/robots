@@ -2,11 +2,14 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from open_manipulator_msgs.msg import KinematicsPose, OpenManipulatorState
-from open_manipulator_msgs.srv import SetKinematicsPose, SetJointPosition
+from open_manipulator_msgs.srv import SetKinematicsPose, SetJointPosition, SetDrawingTrajectory
 from geometry_msgs.msg import Pose, Point, Quaternion
 import math
 import sys
 import time
+from threading import Timer
+
+#TODO: detect a lockout when one of the wait functions spins for too long.
 
 '''
 ROS builds lots of stuff for you, even if it's not always documented
@@ -30,7 +33,6 @@ import inspect
 inspect.getmembers(open_manipulator_msgs.srv, inspect.isclass)
 
 '''
-from threading import Timer
 
 class Joint (object):
     def __init__ (self, name):
@@ -38,6 +40,7 @@ class Joint (object):
         self.name = name
         self.position = 0
         self.velocity = 0
+        self.targetposition = 0
 
 class Arm(Node):
     def __init__(self):
@@ -114,15 +117,40 @@ class Arm(Node):
         self.move_request = SetKinematicsPose.Request()
         self.move_future = None
 
+        # Service: /open_manipulator_x/goal_tool_control
+        # Interface: open_manipulator_msgs/srv/SetJointPosition
+        self.move_gripper_service = self.create_client (
+            SetJointPosition,
+            "/open_manipulator_x/goal_tool_control")
+        while not self.move_gripper_service.wait_for_service (timeout_sec = 1.0):
+            self.get_logger().info("Waiting for goal_tool_control service")
+        self.gripper_request = SetJointPosition.Request()
+        self.gripper_future = None
+
         # Service: /open_manipulator_x/goal_joint_space_path
         # Interface: open_manipulator_msgs/srv/SetJointPosition
         self.move_joint_space_service = self.create_client (
             SetJointPosition,
-            "/open_manipulator_x/goal_tool_control")
+            "/open_manipulator_x/goal_joint_space_path")
         while not self.move_joint_space_service.wait_for_service (timeout_sec = 1.0):
             self.get_logger().info("Waiting for goal_joint_space_path service")
         self.joint_request = SetJointPosition.Request()
         self.joint_future = None
+
+        # Service: /open_manipulator_x/goal_drawing_trajectory
+        # Interface: open_manipulator_msgs/srv/SetDrawingTrajectory
+        self.move_trajectory_service = self.create_client (
+            SetDrawingTrajectory,
+            "/open_manipulator_x/goal_drawing_trajectory")
+        while not self.move_trajectory_service.wait_for_service (timeout_sec = 1.0):
+            self.get_logger().info("Waiting for goal_joint_space_path service")
+        self.trajectory_request = SetDrawingTrajectory.Request()
+        self.trajectory_future = None
+
+
+    #######################################################################
+    #  Listener callbacks
+    #######################################################################
 
     def jointstates_callback(self, msg):
         """Record the current joint state"""
@@ -148,7 +176,6 @@ class Arm(Node):
         self.gripper.position = msg.position[0]
         self.gripper.velocity = msg.velocity[0]
 
-
     def kinematicspose_callback(self, msg):
         """ Record the current kinematic pose"""
         self.x = msg.pose.position.x
@@ -165,6 +192,231 @@ class Arm(Node):
         self.moving = msg.open_manipulator_moving_state
         self.actuator = msg.open_manipulator_actuator_state
         # identify when a requested move has started
+
+
+    #######################################################################
+    #  X,Y position-related movement
+    #######################################################################
+
+    def wait_for_move_complete (self):
+        """Blocks until movement is complete."""
+        tolerance = 0.03
+        while True:
+            distance_to_go = math.sqrt (
+                (self.x - self.targetx)**2 +
+                (self.y - self.targety)**2 +
+                (self.z - self.targetz)**2)
+            if distance_to_go < tolerance:
+                break
+            rclpy.spin_once (self, timeout_sec = 0.1)
+        self.stop_moving()
+
+
+    def move_to (self, x, y, z, blocking = True, accelerate = 1.0):
+        """Moves to a specific x, y, z coordinate."""
+
+        accelerate = max(0.1, accelerate)
+        accelerate = min(5.0, accelerate)
+        self.targetx = x
+        self.targety = y
+        self.targetz = z
+
+        distance_to_move = math.sqrt ((self.x - x)**2 + (self.y - y)**2 + (self.z - z)**2 )
+        if distance_to_move < 0.03:
+            return
+        time_to_move = distance_to_move / self.velocity
+        self.move_request.path_time = time_to_move / accelerate
+
+        self.move_request.end_effector_name = "gripper"
+        self.move_request.kinematics_pose.pose.position.x = self.targetx
+        self.move_request.kinematics_pose.pose.position.y = self.targety
+        self.move_request.kinematics_pose.pose.position.z = self.targetz
+
+        self.move_future = self.move_task_space_service.call_async (self.move_request)
+        rclpy.spin_until_future_complete(self, self.move_future)
+
+        if blocking:
+            self.wait_for_move_complete()
+
+    #######################################################################
+    #  Joint-related movement
+    #######################################################################
+
+    def wait_for_joint_complete (self):
+        """Blocks until movement is stopped."""
+        
+        # give the arm a chance to catch up if movement hasn't
+        # started yet
+        tolerance = 0.02
+        spin = True
+        spincount = 0
+        while spin:
+            spin = False
+            spincount += 1
+            if abs (self.joint1.targetposition - self.joint1.position) > tolerance:
+                spin = True
+            if abs (self.joint2.targetposition - self.joint2.position) > tolerance:
+                spin = True
+            if abs (self.joint3.targetposition - self.joint3.position) > tolerance:
+                spin = True
+            if abs (self.joint4.targetposition - self.joint4.position) > tolerance:
+                spin = True
+            if spincount > 1000:
+                spin = False  #we've waited long enough by now.
+            rclpy.spin_once (self, timeout_sec = 0.1)
+            
+    def move_joints (self, joint1 = None, joint2 = None, joint3 = None, joint4 = None, path_time = 5.0):
+        """Moves to a specific joint configuration."""
+
+        if joint1 == None:
+            self.joint1.targetposition = self.joint1.position
+        else:
+            self.joint1.targetposition = joint1
+
+        if joint2 == None:
+            self.joint2.targetposition = self.joint2.position
+        else:
+            self.joint2.targetposition = joint2
+
+        if joint3 == None:
+            self.joint3.targetposition = self.joint3.position
+        else:
+            self.joint3.targetposition = joint3
+
+        if joint4 == None:
+            self.joint4.targetposition = self.joint4.position
+        else:
+            self.joint4.targetposition = joint4
+
+        self.joint_request.joint_position.joint_name = ["joint1", "joint2", "joint3", "joint4"]
+        self.joint_request.joint_position.position = [
+            self.joint1.targetposition, self.joint2.targetposition, 
+            self.joint3.targetposition, self.joint4.targetposition]
+
+        self.joint_request.path_time = path_time
+        self.joint_future = self.move_joint_space_service.call_async (self.joint_request)
+        rclpy.spin_until_future_complete(self, self.joint_future)
+        self.wait_for_joint_complete()
+
+
+    #######################################################################
+    #  Trajectory movemement
+    #######################################################################
+
+    def wait_for_trajectory_complete (self):
+        """Blocks until movement is stopped."""
+        
+        # start by looking for moving state to not be stopped
+        spin = True
+        spincount = 0
+        while spin:
+            spincount += 1
+            if self.moving != "STOPPED":
+                spin = False
+            if spincount > 10:
+                spin = False
+            rclpy.spin_once (self, timeout_sec = 0.1)
+
+        # should be moving by now, wait until stopped
+        spin = True
+        while spin:
+            if self.moving == "STOPPED":
+                spin = False
+            if spincount > 100:
+                spin = False
+            rclpy.spin_once (self, timeout_sec = 0.1)
+
+
+    def circle (self, radius=0.03, revolution=1.0, start_angle=0.0, path_time = 5.0):
+        # this trajectory takes a radius, revolution, start_angular_position.
+        self.trajectory_request.path_time = path_time
+        self.trajectory_request.end_effector_name = "gripper"
+        self.trajectory_request.drawing_trajectory_name = "circle"
+        self.trajectory_request.param = [radius, revolution, start_angle]
+        self.trajectory_future = self.move_trajectory_service.call_async (self.trajectory_request)
+        rclpy.spin_until_future_complete(self, self.trajectory_future)
+        self.wait_for_trajectory_complete()
+
+
+    #######################################################################
+    #  Gripper movement
+    #######################################################################
+
+    def move_gripper (self, pos):
+        pos = max (-0.01, pos)
+        pos = min (+0.01, pos)
+        self.gripper_request.joint_position.joint_name = ["gripper"]
+        self.gripper_request.joint_position.position = [float(pos)]
+        self.gripper_future = self.move_gripper_service.call_async (self.gripper_request)
+        rclpy.spin_until_future_complete(self, self.gripper_future)
+        time.sleep(0.5)
+
+    def open (self):
+        """Open the gripper"""
+        self.move_gripper (0.01)
+
+    def close (self):
+        """Open the gripper"""
+        self.move_gripper (-0.01)
+
+
+    #######################################################################
+    #  effort-related movement
+    #######################################################################
+
+    def wait_for_move_torqued (self):
+        """Blocks until done or joint 4 hits effort limit"""
+
+        while True:
+            if self.joint2.effort > 10:
+                break
+            rclpy.spin_once (self)  # wait for a callback to update joint effort
+        self.stop_moving()
+
+    def wait_for_move_untorqued (self):
+        """Blocks until done or joint 4 hits zero effort"""
+
+        while True:
+            if self.joint2.effort <= 0:
+                break
+            rclpy.spin_once (self)  # wait for a callback to update joint effort
+        self.stop_moving()
+
+    def find_surface (self):
+        """Move down until torqued, move up until torque is zero, then record the touch point"""
+
+        self.targetx = self.x
+        self.targety = self.y
+        self.targetz = 0.0
+
+        # move down
+        self.move_request.path_time = 6.0
+        self.move_request.end_effector_name = "gripper"
+        self.move_request.kinematics_pose.pose.position.x = self.targetx
+        self.move_request.kinematics_pose.pose.position.y = self.targety
+        self.move_request.kinematics_pose.pose.position.z = self.targetz
+        self.move_future = self.move_task_space_service.call_async (self.move_request)
+        rclpy.spin_until_future_complete(self, self.move_future)
+        self.wait_for_move_torqued()
+
+        # back off
+        self.targetx = self.x
+        self.targety = self.y
+        self.targetz = self.z + 0.02
+        self.move_request.path_time = 2.0
+        self.move_request.end_effector_name = "gripper"
+        self.move_request.kinematics_pose.pose.position.x = self.targetx
+        self.move_request.kinematics_pose.pose.position.y = self.targety
+        self.move_request.kinematics_pose.pose.position.z = self.targetz
+        self.move_future = self.move_task_space_service.call_async (self.move_request)
+        rclpy.spin_until_future_complete(self, self.move_future)
+        self.wait_for_move_untorqued()
+        time.sleep (0.5)    # let the arm settle
+
+
+    #######################################################################
+    #  Utilities
+    #######################################################################
 
     def status (self):
         """Returns a string of the current state of the arm"""
@@ -203,6 +455,29 @@ Actuator State: %s
         self.print_status()
         Timer (1, self.reprint_status).start()
 
+    def load (self):
+        """Move to a neutral position, ask for a pencil and tension the gripper"""
+        if self.holding_pencil:
+            return
+        
+        #self.move_to (0.1500, 0.0000, 0.1000)
+        self.move_to (0.2440, 0.0000, 0.1500)
+        self.open()
+        self.close()
+        self.open()
+        input ("Place the pointer and press enter:")
+        self.close()
+        self.baseplate = self.z
+
+
+    def record_height (self, x, y):
+        self.move_to (self.x, self.y, 0.2000, accelerate = 1.5)
+        self.move_to (x, y, 0.2000, accelerate = 1.5)
+        self.find_surface()
+        height = self.z
+        self.move_to (x, y, 0.2000, accelerate = 1.5)
+        return height
+
     def stop_moving (self):
         """Make the current position the planned position."""
 
@@ -220,133 +495,6 @@ Actuator State: %s
         rclpy.spin_until_future_complete(self, self.move_future)
 
 
-    def move_to (self, x, y, z, blocking = True, accelerate = 1.0):
-        """Moves to a specific x, y, z coordinate."""
-
-        self.targetx = x
-        self.targety = y
-        self.targetz = z
-
-        distance_to_move = math.sqrt ((self.x - x)**2 + (self.y - y)**2 + (self.z - z)**2 )
-        time_to_move = distance_to_move / self.velocity
-        self.move_request.path_time = time_to_move / accelerate
-
-        self.move_request.end_effector_name = "gripper"
-        self.move_request.kinematics_pose.pose.position.x = self.targetx
-        self.move_request.kinematics_pose.pose.position.y = self.targety
-        self.move_request.kinematics_pose.pose.position.z = self.targetz
-
-        self.move_future = self.move_task_space_service.call_async (self.move_request)
-        rclpy.spin_until_future_complete(self, self.move_future)
-
-        if blocking:
-            self.wait_for_move_complete()
-
-    def open (self):
-        """Open the gripper"""
-
-        self.joint_request.joint_position.joint_name = ["gripper"]
-        self.joint_request.joint_position.position = [0.0000]
-        self.joint_future = self.move_joint_space_service.call_async (self.joint_request)
-
-        rclpy.spin_until_future_complete(self, self.joint_future)
-        time.sleep(0.5)
-
-    def close (self):
-        """Open the gripper"""
-
-        self.joint_request.joint_position.joint_name = ["gripper"]
-        self.joint_request.joint_position.position = [-0.01]
-        self.joint_future = self.move_joint_space_service.call_async (self.joint_request)
-
-        rclpy.spin_until_future_complete(self, self.joint_future)
-        time.sleep(0.5)
-
-    def wait_for_move_complete (self):
-        """Blocks until movement is complete."""
-
-        while True:
-            distance_to_go = math.sqrt (
-                (self.x - self.targetx)**2 +
-                (self.y - self.targety)**2 +
-                (self.z - self.targetz)**2)
-            if distance_to_go < 0.02:
-                break
-            rclpy.spin_once (self, timeout_sec = 0.1)
-        self.stop_moving()
-
-    def wait_for_move_torqued (self):
-        """Blocks until done or joint 4 hits effort limit"""
-
-        while True:
-            if self.joint2.effort > 10:
-                break
-            rclpy.spin_once (self)  # wait for a callback to update joint effort
-        self.stop_moving()
-
-    def wait_for_move_untorqued (self):
-        """Blocks until done or joint 4 hits zero effort"""
-
-        while True:
-            if self.joint2.effort <= 0:
-                break
-            rclpy.spin_once (self)  # wait for a callback to update joint effort
-        self.stop_moving()
-
-    def load (self):
-        """Move to a neutral position, ask for a pencil and tension the gripper"""
-        if self.holding_pencil:
-            return
-        
-        #self.move_to (0.1500, 0.0000, 0.1000)
-        self.move_to (0.2440, 0.0000, 0.1500)
-        self.open()
-        self.close()
-        self.open()
-        input ("Place the pointer and press enter:")
-        self.close()
-        self.baseplate = self.z
-
-    def find_surface (self):
-        """Move down until torqued, move up until torque is zero, then record the touch point"""
-
-        self.targetx = self.x
-        self.targety = self.y
-        self.targetz = 0.0
-
-
-        # move down
-        self.move_request.path_time = 6.0
-        self.move_request.end_effector_name = "gripper"
-        self.move_request.kinematics_pose.pose.position.x = self.targetx
-        self.move_request.kinematics_pose.pose.position.y = self.targety
-        self.move_request.kinematics_pose.pose.position.z = self.targetz
-        self.move_future = self.move_task_space_service.call_async (self.move_request)
-        rclpy.spin_until_future_complete(self, self.move_future)
-        self.wait_for_move_torqued()
-
-        # back off
-        self.targetx = self.x
-        self.targety = self.y
-        self.targetz = self.z + 0.02
-        self.move_request.path_time = 2.0
-        self.move_request.end_effector_name = "gripper"
-        self.move_request.kinematics_pose.pose.position.x = self.targetx
-        self.move_request.kinematics_pose.pose.position.y = self.targety
-        self.move_request.kinematics_pose.pose.position.z = self.targetz
-        self.move_future = self.move_task_space_service.call_async (self.move_request)
-        rclpy.spin_until_future_complete(self, self.move_future)
-        self.wait_for_move_untorqued()
-        time.sleep (0.5)    # let the arm settle
-
-
-    def record_height (self, x, y):
-        self.move_to (self.x, self.y, 0.2000, accelerate = 1.5)
-        self.move_to (x, y, 0.2000, accelerate = 1.5)
-        self.find_surface()
-        height = self.z
-        self.move_to (x, y, 0.2000, accelerate = 1.5)
-        return height
 
 
 def main(argv):
