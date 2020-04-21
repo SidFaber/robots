@@ -43,8 +43,9 @@ class Joint (object):
         self.targetposition = 0
 
 class Arm(Node):
-    def __init__(self):
-        super().__init__('arm')
+    def __init__(self, node_name = "arm"):
+
+        super().__init__(node_name)
 
         self.x = 0
         self.y = 0
@@ -79,7 +80,7 @@ class Arm(Node):
         #
         # Topic: /open_manipulator_x/joint_states
         # Type: sensor_msgs/msg/JointState
-        # pubilshed at 100Hz
+        # published at 100Hz
         self.jointstate_sub = self.create_subscription(
             JointState,
             "/open_manipulator_x/joint_states",
@@ -147,7 +148,7 @@ class Arm(Node):
         self.trajectory_request = SetDrawingTrajectory.Request()
         self.trajectory_future = None
 
-
+               
     #######################################################################
     #  Listener callbacks
     #######################################################################
@@ -418,9 +419,9 @@ class Arm(Node):
     #  Utilities
     #######################################################################
 
-    def status (self):
+    def print_status (self):
         """Returns a string of the current state of the arm"""
-        return ("""
+        return (chr(27) + """[2J
            ------------------------------------------------------------------
            | %10s | %10s | %10s | %10s | %10s |
 -----------------------------------------------------------------------------
@@ -448,8 +449,30 @@ Actuator State: %s
                 self.moving, self.actuator
                 ))
         
-    def print_status (self):
-        print (chr(27) + "[2J" + self.status())
+    def json_status (self):
+        """Returns a json object representing the current state of the arm"""
+        return ("""{
+"joint1": [%+10.4f, %+10.4f, %+10.4f],
+"joint2": [%+10.4f, %+10.4f, %+10.4f],
+"joint3": [%+10.4f, %+10.4f, %+10.4f],
+"joint4": [%+10.4f, %+10.4f, %+10.4f],
+"gripper": [%+10.4f, %+10.4f, %+10.4f],
+"position": [%+10.4f, %+10.4f, %+10.4f],
+"quaternion": [%+10.4f, %+10.4f, %+10.4f, %+10.4f],
+"moving": "%s",
+"state": "%s"
+"""
+            % (
+                self.joint1.position, self.joint1.velocity, self.joint1.effort, 
+                self.joint2.position, self.joint2.velocity, self.joint2.effort, 
+                self.joint3.position, self.joint3.velocity, self.joint3.effort, 
+                self.joint4.position, self.joint4.velocity, self.joint4.effort, 
+                self.gripper.position, self.gripper.velocity, self.gripper.effort, 
+                self.x, self.y, self.z, 
+                self.ow, self.ox, self.oy, self.oz, 
+                self.moving, self.actuator
+                ))
+        
 
     def reprint_status (self):
         self.print_status()
