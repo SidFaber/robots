@@ -15,38 +15,136 @@
 </head>
 
 <body>
-
     <div class="wrapper">
         <div id="main-content" class="inner-wrapper">
             <div class="row u-equal-height">
                 <div class="col-8">
-                    <h1>Status</h1>
-                    <h4>Arm</h4>
-                    <table>
+                    <h1>Arm Status</h1>
+                    <h2>Position</h2>
+                    <table id=position>
                         <tr>
-                            <td>Position</td>
-                            <td>x</td>
-                            <td>y</td>
-                            <td>z</td>
-
+                            <td>&nbsp;</td>
+                            <td>Current (cm)</td>
+                            <td>Target (cm)</td>
+                        </tr>
+                        <tr>
+                            <td>X</td>
+                            <td><div id='status.x'>&nbsp</div></td>
+                            <td><div id='target.x'>&nbsp</div></td>
+                        </tr>
+                        <tr>
+                            <td>Y</td>
+                            <td><div id='status.y'>&nbsp</div></td>
+                            <td><div id='target.y'>&nbsp</div></td>
+                        </tr>
+                        <tr>
+                            <td>Z</td>
+                            <td><div id='status.z'>&nbsp</div></td>
+                            <td><div id='target.z'>&nbsp</div></td>
                         </tr>
                     </table>
-                    Position: x, y, z
+                    <h2>Joints</h2>
+                    <table id=joints>
+                        <tr>
+                            <td>&nbsp;</td>
+                            <td>Current<br/>(degrees)</td>
+                            <td>Target<br/>(degrees)</td>
+                            <td>Velocity<br/>(degrees/sec)</td>
+                        </tr>
+                        <tr>
+                            <td>Joint 1</td>
+                            <td><div id='joint1.current'>&nbsp</div></td>
+                            <td><div id='joint1.target'>&nbsp</div></td>
+                            <td><div id='joint1.velocity'>&nbsp</div></td>
+                        </tr>
+                        <tr>
+                            <td>Joint 2</td>
+                            <td><div id='joint2.current'>&nbsp</div></td>
+                            <td><div id='joint2.target'>&nbsp</div></td>
+                            <td><div id='joint2.velocity'>&nbsp</div></td>
+                        </tr>
+                        <tr>
+                            <td>Joint 3</td>
+                            <td><div id='joint3.current'>&nbsp</div></td>
+                            <td><div id='joint3.target'>&nbsp</div></td>
+                            <td><div id='joint3.velocity'>&nbsp</div></td>
+                        </tr>
+                        <tr>
+                            <td>Joint 4</td>
+                            <td><div id='joint4.current'>&nbsp</div></td>
+                            <td><div id='joint4.target'>&nbsp</div></td>
+                            <td><div id='joint4.velocity'>&nbsp</div></td>
+                        </tr>
+                    </table>
+
+                    <p/>
                     <hr/>
 
-                    <h1>Build security into your robot’s future with Ubuntu</h1>
-                  <h4>Tech visionaries choose Ubuntu to build ultra-secure and software-defined robots</h4>
-                  <p>Ubuntu is the most popular Linux distribution for large embedded systems. As autonomous robots mature, innovative tech companies turn to Ubuntu to realise their vision of a robotic future. We are your partner in innovation.</p>
-                  <p><a class="p-button--positive js-invoke-modal" href="/internet-of-things/contact-us?product=robotics">Reach out to hear more</a></p>
-                  <p><a href="/whitepapers/beta/robotics">Read the whitepaper “Pick the right OS for your robot”&nbsp;›</a></p>
+                  <p>
+                    <a class="p-button--positive js-invoke-modal" href="javascript:move('up');">Move 1</a>
+                    <a class="p-button--positive js-invoke-modal" href="javascript:move('front');">Move 2</a>
+                    <a class="p-button--positive js-invoke-modal" href="javascript:move('home');">Move 3</a>
+                </p>
+
                 </div>
                 <div class="col-4 u-align--center u-vertically-center u-hide--small">
-                  
+                <p/> 
                 <img src="https://res.cloudinary.com/canonical/image/fetch/f_auto,q_auto,fl_sanitize,w_240,h_240/https://assets.ubuntu.com/v1/29eb5a8e-Robot+arm+-+dark+grey.svg" srcset="https://res.cloudinary.com/canonical/image/fetch/f_auto,q_auto,fl_sanitize,w_480,h_480/https://assets.ubuntu.com/v1/29eb5a8e-Robot+arm+-+dark+grey.svg 2x" alt="" width="240" height="240" loading="auto">
                 </div>
               </div>
 
         </div>
     </div>
+
+    <script>
+        var xmlhttp
+
+        function toDegrees (r) {
+            return r * 180.0 / Math.PI
+        }
+
+        function move(whereto) {
+            mv = new XMLHttpRequest();
+            xmlhttp.open("GET", whereto, true);
+            xmlhttp.send();
+        }
+
+        function updateStatus() {
+            if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                resp = JSON.parse(xmlhttp.responseText);
+                document.getElementById("status.x").innerHTML = (resp.position.x * 100.0).toFixed(2).toString();
+                document.getElementById("status.y").innerHTML = (resp.position.y * 100.0).toFixed(2).toString();
+                document.getElementById("status.z").innerHTML = (resp.position.z * 100.0).toFixed(2).toString();
+                document.getElementById("target.x").innerHTML = (resp.targetposition.x * 100.0).toFixed(2).toString();
+                document.getElementById("target.y").innerHTML = (resp.targetposition.y * 100.0).toFixed(2).toString();
+                document.getElementById("target.z").innerHTML = (resp.targetposition.z * 100.0).toFixed(2).toString();
+
+                document.getElementById("joint1.current").innerHTML = toDegrees(resp.joint1.position).toFixed(0).toString();
+                document.getElementById("joint1.target").innerHTML = toDegrees(resp.joint1.targetposition).toFixed(0).toString();
+                document.getElementById("joint1.velocity").innerHTML = toDegrees(resp.joint1.velocity).toFixed(0).toString();
+                document.getElementById("joint2.current").innerHTML = toDegrees(resp.joint2.position).toFixed(0).toString();
+                document.getElementById("joint2.target").innerHTML = toDegrees(resp.joint2.targetposition).toFixed(0).toString();
+                document.getElementById("joint2.velocity").innerHTML = toDegrees(resp.joint2.velocity).toFixed(0).toString();
+                document.getElementById("joint3.current").innerHTML = toDegrees(resp.joint3.position).toFixed(0).toString();
+                document.getElementById("joint3.target").innerHTML = toDegrees(resp.joint3.targetposition).toFixed(0).toString();
+                document.getElementById("joint3.velocity").innerHTML = toDegrees(resp.joint3.velocity).toFixed(0).toString();
+                document.getElementById("joint4.current").innerHTML = toDegrees(resp.joint4.position).toFixed(0).toString();
+                document.getElementById("joint4.target").innerHTML = toDegrees(resp.joint4.targetposition).toFixed(0).toString();
+                document.getElementById("joint4.velocity").innerHTML = toDegrees(resp.joint4.velocity).toFixed(0).toString();
+                setTimeout (readStatus, 500)
+            }
+        }
+        
+        function readStatus() {
+            xmlhttp = new XMLHttpRequest();
+            xmlhttp.onreadystatechange = updateStatus;
+            xmlhttp.open("GET", "api", true);
+            //xmlhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+            xmlhttp.send();
+        }
+
+        setTimeout (readStatus, 1000)
+
+    </script>
 </body>
 </html> 

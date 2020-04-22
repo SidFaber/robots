@@ -32,13 +32,12 @@ def main (argv):
     time.sleep(2.0)
     arm.move_joints (joint1=-0.3022, joint2=-0.7409, joint3=+0.8820, joint4=-0.1488, path_time=1.5)
 
-    #return to the other side
-    arm.move_to (+0.2670, -0.1400, +0.2000)
-    arm.find_surface()
-    # account for some slack in the arm
-    arm.move_to (arm.x, arm.y, arm.z+0.0350, accelerate=0.2)
-    arm.move_gripper(0.0000)
-    arm.move_to (+0.2015, -0.1000, arm.z, accelerate=0.2)
+    #return
+    arm.move_to (+0.2015, +0.1000, +0.0850)
+    arm.move_to (+0.2670, +0.1400, +0.0850, accelerate=0.2)
+    arm.open()
+    time.sleep (0.5)
+    arm.move_to (+0.2015, +0.1000, +0.0850, accelerate=0.2)
 
     #go to neutral
     arm.move_to (+0.2200, +0.0000, +0.1000)
