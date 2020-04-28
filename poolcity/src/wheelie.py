@@ -8,7 +8,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 from geometry_msgs.msg import Twist, Vector3
-from sensor_msgs.msg import Joy
+from sensor_msgs.msg import Joy, Range
 
 class Wheelie (Node):
     '''Wheelie node suitable for a RPi robot with two PWM driven motors
@@ -19,7 +19,12 @@ class Wheelie (Node):
 
     Attributes
     ----------
-    None.
+    speed : float
+        Speed along the X axis in meters per second; positive is
+        forward and negative is backward
+    spin : float
+        Rotation about the pivot point in radians per second; positive
+        is clockwise when viewed from above (right spin)
 
     Methods
     -------
@@ -35,16 +40,6 @@ class Wheelie (Node):
         frequency = 20):
 
         """
-        Properties
-        ----------
-        speed : float
-            Speed along the X axis in meters per second; positive is
-            forward and negative is backward
-        spin : float
-            Rotation about the pivot point in radians per second; positive
-            is clockwise when viewed from above (right spin)
-
-
         Parameters
         ----------
         name: str
@@ -88,23 +83,32 @@ class Wheelie (Node):
 
         self.speed = 0.0
         self.spin = 0.0
+        self.close = 0.30  #start slowing down when this close
+        self.stop = 0.10   #no forward motion when this close
+        self.distance = 0.0
 
-        self.subscription = self.create_subscription(
+        self._command_subscription = self.create_subscription(
             String,
             'command',
             self._command_callback,
             10)
 
-        self.subscription = self.create_subscription(
+        self._cmd_vel_subscription = self.create_subscription(
             Twist,
             'cmd_vel',
             self._cmd_vel_callback,
             2)
 
-        self.subscription = self.create_subscription(
+        self._joy_subscription = self.create_subscription(
             Joy,
             'joy',
             self._joy_callback,
+            5)
+
+        self._range_subscription = self.create_subscription(
+            Range,
+            'range',
+            self._range_callback,
             5)
 
     def stop (self):
@@ -159,6 +163,7 @@ class Wheelie (Node):
         Just use the left joystick (for now):
         LSB left/right  axes[0]     +1 (left) to -1 (right)
         LSB up/down     axes[1]     +1 (up) to -1 (back)
+        LB              buttons[5]  1 pressed, 0 otherwise
         '''
         
         if abs(msg.axes[0]) > 0.10:
@@ -182,6 +187,10 @@ class Wheelie (Node):
         self.spin = msg.angular.z
         self._set_motor_speeds()
 
+    def _range_callback(self, msg):
+        self.distance = msg.range
+        self._set_motor_speeds()
+
     def _set_motor_speeds(self):
         #TODO: inject a stop() if no speeds seen for a while
         #
@@ -195,7 +204,7 @@ class Wheelie (Node):
         right_twist_mps = self.spin * self._wheel_base / self._wheel_diameter
         left_twist_mps = -1.0 * self.spin * self._wheel_base / self._wheel_diameter
         #
-        # Now add in forward motion
+        # Now add in forward motion.
         # 
         left_mps = self.speed + left_twist_mps
         right_mps = self.speed + right_twist_mps
@@ -213,6 +222,18 @@ class Wheelie (Node):
         left_percentage = max (min (left_percentage, 100.0), -100.0)
         right_percentage = max (min (right_percentage, 100.0), -100.0)
         #
+        # Add in a governor to cap forward motion when we're about
+        # to collide with something (but still backwards motion)
+        governor = 1.0
+        if self.distance < self.stop:
+            governor = 0.0
+        elif self.distance < self.close:
+            governor = (self.distance - self.stop) / (self.close - self.stop)
+        if right_percentage > 0:
+            right_percentage *= governor
+        if left_percentage > 0:
+            left_percentage *= governor
+        # 
         self._rightWheel.run(right_percentage)
         self._leftWheel.run(left_percentage)
 
