@@ -7,6 +7,7 @@ from geometry_msgs.msg import Pose, Point, Quaternion
 import math
 import sys
 import time
+import json
 from threading import Timer
 
 #TODO: detect a lockout when one of the wait functions spins for too long.
@@ -43,8 +44,9 @@ class Joint (object):
         self.targetposition = 0
 
 class Arm(Node):
-    def __init__(self):
-        super().__init__('arm')
+    def __init__(self, node_name = "arm"):
+
+        super().__init__(node_name)
 
         self.x = 0
         self.y = 0
@@ -79,7 +81,7 @@ class Arm(Node):
         #
         # Topic: /open_manipulator_x/joint_states
         # Type: sensor_msgs/msg/JointState
-        # pubilshed at 100Hz
+        # published at 100Hz
         self.jointstate_sub = self.create_subscription(
             JointState,
             "/open_manipulator_x/joint_states",
@@ -147,7 +149,7 @@ class Arm(Node):
         self.trajectory_request = SetDrawingTrajectory.Request()
         self.trajectory_future = None
 
-
+               
     #######################################################################
     #  Listener callbacks
     #######################################################################
@@ -264,6 +266,7 @@ class Arm(Node):
             if spincount > 1000:
                 spin = False  #we've waited long enough by now.
             rclpy.spin_once (self, timeout_sec = 0.1)
+        self.stop_moving()
             
     def move_joints (self, joint1 = None, joint2 = None, joint3 = None, joint4 = None, path_time = 5.0):
         """Moves to a specific joint configuration."""
@@ -418,9 +421,9 @@ class Arm(Node):
     #  Utilities
     #######################################################################
 
-    def status (self):
+    def print_status (self):
         """Returns a string of the current state of the arm"""
-        return ("""
+        return (chr(27) + """[2J
            ------------------------------------------------------------------
            | %10s | %10s | %10s | %10s | %10s |
 -----------------------------------------------------------------------------
@@ -448,8 +451,62 @@ Actuator State: %s
                 self.moving, self.actuator
                 ))
         
-    def print_status (self):
-        print (chr(27) + "[2J" + self.status())
+    def json_status (self):
+        """Returns a json object representing the current state of the arm"""
+
+        #TODO: rewrite this in generic ROS message formats
+        curr = {
+            "position": {
+                "x": round(self.x, 4),
+                "y": round(self.y, 4),
+                "z": round(self.z, 4)
+            },
+            "targetposition": {
+                "x": round(self.targetx, 4),
+                "y": round(self.targety, 4),
+                "z": round(self.targetz, 4)
+            },
+            "quaternion": {
+                "w": round(self.ow, 4),
+                "x": round(self.ox, 4),
+                "y": round(self.oy, 4),
+                "z": round(self.oz, 4)
+            },
+            "joint1" : {
+                "position": round(self.joint1.position, 4),
+                "targetposition": round(self.joint1.targetposition, 4),
+                "velocity": round(self.joint1.velocity, 4),
+                "effort": round(self.joint1.effort, 4)
+            },
+            "joint2" : {
+                "position": round(self.joint2.position, 4),
+                "targetposition": round(self.joint2.targetposition, 4),
+                "velocity": round(self.joint2.velocity, 4),
+                "effort": round(self.joint2.effort, 4)
+            },
+            "joint3" : {
+                "position": round(self.joint3.position, 4),
+                "targetposition": round(self.joint3.targetposition, 4),
+                "velocity": round(self.joint3.velocity, 4),
+                "effort": round(self.joint3.effort, 4)
+            },
+            "joint4" : {
+                "position": round(self.joint4.position, 4),
+                "targetposition": round(self.joint4.targetposition, 4),
+                "velocity": round(self.joint4.velocity, 4),
+                "effort": round(self.joint4.effort, 4)
+            },
+            "gripper" : {
+                "position": round(self.gripper.position, 4),
+                "targetposition": round(self.gripper.targetposition, 4),
+                "velocity": round(self.gripper.velocity, 4),
+                "effort": round(self.gripper.effort, 4)
+            },
+            "moving": self.moving,
+            "actuator": self.actuator
+        }
+        
+        return json.dumps (curr)
 
     def reprint_status (self):
         self.print_status()
@@ -485,16 +542,29 @@ Actuator State: %s
         self.targety = self.y
         self.targetz = self.z
 
-        self.move_request.path_time = 0.1
-        self.move_request.end_effector_name = "gripper"
-        self.move_request.kinematics_pose.pose.position.x = self.targetx
-        self.move_request.kinematics_pose.pose.position.y = self.targety
-        self.move_request.kinematics_pose.pose.position.z = self.targetz
+        self.joint1.targetposition = self.joint1.position
+        self.joint2.targetposition = self.joint2.position
+        self.joint3.targetposition = self.joint3.position
+        self.joint4.targetposition = self.joint4.position
+        self.gripper.targetposition = self.gripper.position
 
-        self.move_future = self.move_task_space_service.call_async (self.move_request)
-        rclpy.spin_until_future_complete(self, self.move_future)
+        # lock in the current joint position
+        self.joint_request.joint_position.joint_name = ["joint1", "joint2", "joint3", "joint4"]
+        self.joint_request.joint_position.position = [
+            self.joint1.targetposition, self.joint2.targetposition, 
+            self.joint3.targetposition, self.joint4.targetposition]
+        self.joint_request.path_time = 0.5
+        self.joint_future = self.move_joint_space_service.call_async (self.joint_request)
+        rclpy.spin_until_future_complete(self, self.joint_future)
 
+        # self.move_request.path_time = 0.1
+        # self.move_request.end_effector_name = "gripper"
+        # self.move_request.kinematics_pose.pose.position.x = self.targetx
+        # self.move_request.kinematics_pose.pose.position.y = self.targety
+        # self.move_request.kinematics_pose.pose.position.z = self.targetz
 
+        # self.move_future = self.move_task_space_service.call_async (self.move_request)
+        # rclpy.spin_until_future_complete(self, self.move_future)
 
 
 def main(argv):
