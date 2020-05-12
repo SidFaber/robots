@@ -17,6 +17,7 @@ class UltrasonicDistanceSensor:
         Return the distance in meters seen by the sensor
 
     '''
+
     def __init__ (self, pinTrigger, pinEcho):
         # Configure GPIO
         GPIO.setmode (GPIO.BCM)
@@ -49,8 +50,6 @@ class UltrasonicDistanceSensor:
         to go low again, and compute distance based on that time.
         '''
 
-
-
         #  Send a 10us pulse
         GPIO.output (pinTrigger, True)
         time.sleep (0.00001)
@@ -67,32 +66,6 @@ class UltrasonicDistanceSensor:
                 StopTime = StartTime
                 break
         elapsed_time = StopTime - StartTime
-
-        # GPIO.output (self._pinTrigger, False)
-        # time.sleep (0.000005)
-
-        # start_marked = False
-
-        # GPIO.output (pinTrigger, True)
-        # time.sleep (0.000010)
-        # GPIO.output (pinTrigger, False)
-
-        # mark = time.time()
-        # elapsed_time = time.time() - mark
-        # while elapsed_time < 0.01:
-        #     elapsed_time = time.time() - mark
-        #     if GPIO.input (pinEcho) != 0:
-        #         start_marked = True
-        # if start_marked:
-        #     mark = time.time()
-        #     elapsed_time = time.time() - mark
-        #     while elapsed_time < self._max_travel_time:
-        #         elapsed_time = time.time() - mark
-        #         if GPIO.input (pinEcho) != 1:
-        #             break
-        # else:
-        #     # too close to capture the signal going high
-        #     elapsed_time = 0
 
         return elapsed_time * self.speed_of_sound / 2
 

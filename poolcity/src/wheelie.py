@@ -253,32 +253,6 @@ def main(args=None):
     rclpy.spin (w)
     rclpy.shutdown()
 
-    # w.forward()
-    # time.sleep (1)
-    # w.reverse()
-    # time.sleep(1)
-    # w.stop()
-    # time.sleep(1)
-    # w.left()
-    # time.sleep(1)
-    # w.right()
-    # time.sleep(1)
-    # w.stop()
-
-    # #  initialize the wheelie node
-    # rclpy.init(args=args)
-    # minimal_subscriber = MinimalSubscriber()
-
-    # #  wait for incoming commands
-    # rclpy.spin(minimal_subscriber)
-
-    # #  Interrupt detected, shut down
-    # minimal_subscriber.wheelie.stop()
-    # GPIO.cleanup()
-    # minimal_subscriber.destroy_node()
-    # rclpy.shutdown()
-
-
 
 if __name__ == '__main__':
     main()
