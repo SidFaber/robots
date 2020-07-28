@@ -1,0 +1,17 @@
+[Unit]
+Description="OpenMANIPULATOR-X web service"
+
+[Service]
+# change based on distro
+# assumes robotis install directory is /opt/robotis_ws/install (not /home/ubuntu)
+Environment="LD_LIBRARY_PATH=/opt/robotis_ws/install/open_manipulator_x_libs/lib:/opt/robotis_ws/install/robotis_manipulator/lib:/opt/robotis_ws/install/open_manipulator_msgs/lib:/opt/robotis_ws/install/dynamixel_workbench_toolbox/lib:/opt/robotis_ws/install/dynamixel_sdk/lib:/opt/ros/eloquent/lib"
+Environment="PYTHONPATH=/opt/robotis_ws/install/open_manipulator_msgs/lib/python3.6/site-packages:/opt/robotis_ws/build/joint_state_publisher:/opt/robotis_ws/install/joint_state_publisher/lib/python3.6/site-packages:/opt/ros/eloquent/lib/python3.6/site-packages"
+
+Environment="AMENT_PREFIX_PATH=/opt/robotis_ws/install/open_manipulator_x:/opt/robotis_ws/install/open_manipulator_x_controller:/opt/robotis_ws/install/open_manipulator_x_libs:/opt/robotis_ws/install/robotis_manipulator:/opt/robotis_ws/install/open_manipulator_x_teleop:/opt/robotis_ws/install/open_manipulator_x_description:/opt/robotis_ws/install/open_manipulator_msgs:/opt/robotis_ws/install/joint_state_publisher:/opt/robotis_ws/install/dynamixel_workbench:/opt/robotis_ws/install/dynamixel_workbench_toolbox:/opt/robotis_ws/install/dynamixel_sdk:/home/ubuntu/robotis_ws/install/cmake_modules:/opt/ros/eloquent"
+
+Environment="HOME=/var/log"
+ExecStart=/usr/bin/python3 /opt/web/webservice.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
