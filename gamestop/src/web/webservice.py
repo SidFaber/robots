@@ -1,13 +1,19 @@
+#!/usr/bin/env python
 #
 #  Start with 
 # export FLASK_APP=api.py
 # flask run --host=0.0.0.0
 #
-from flask import Flask
-from flask import render_template
+# This flask project includes code from 
+# https://github.com/miguelgrinberg/flask-video-streaming
+# for setting up a streaming camera
+#
 from arm import Arm
-import rclpy
+from camera import Camera
+from flask import Flask, render_template, Response
 from threading import Thread
+
+import rclpy
 import sys
 import time
 
@@ -27,6 +33,12 @@ class ArmThread (Thread):
             else:
                 time.sleep(0.5)
 
+def gen(camera):
+    """Video streaming generator function."""
+    while True:
+        frame = camera.get_frame()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 try:
     rclpy.init (args=sys.argv)
@@ -55,6 +67,13 @@ def api():
     #for i in range(0, 20):
     #    rclpy.spin_once(arm, timeout_sec=0.01)
     return arm.json_status()
+
+
+@app.route('/video_feed')
+def video_feed():
+    """Video streaming route. Put this in the src attribute of an img tag."""
+    return Response(gen(Camera()),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/home')
 def home():
@@ -107,3 +126,6 @@ def front():
 
     armthread.spinning = True
     return ""
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', threaded=True)
