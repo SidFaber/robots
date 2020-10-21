@@ -1,7 +1,12 @@
+#! /bin/python3
+#
+#  This code derived largely from the ROS 2 tutorials,
+#  https://index.ros.org/doc/ros2/Tutorials/Writing-A-Simple-Py-Publisher-And-Subscriber/
+#
+import os
 from random import random
 import rclpy
 from rclpy.node import Node
-
 from std_msgs.msg import String
 import sys
 
@@ -23,8 +28,6 @@ class MinimalSubscriber(Node):
 
 def main(msg = ""):
     rclpy.init(args=None)
-    msg += ":"
-    msg += str(int(random()*1000))
 
     minimal_subscriber = MinimalSubscriber(msg)
 
@@ -38,7 +41,9 @@ def main(msg = ""):
 
 
 if __name__ == '__main__':
+    msg = ""
     if len (sys.argv) == 2:
-        main (sys.argv[1])
-    else:
-        main()
+        msg += sys.argv[1] + ":"
+    msg += os.environ['HOSTNAME']
+    msg += ":" + str(int(random()*1000))
+    main(msg)
