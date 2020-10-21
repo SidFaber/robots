@@ -17,7 +17,7 @@ from rclpy.node import Node
 #
 #  When the service is triggered, send messages for 5-25 seconds on the microk8s topic
 #
-from example_interfaces.srv import AddTwoInts
+from std_srvs.srv import Trigger
 
 import rclpy
 from rclpy.node import Node
