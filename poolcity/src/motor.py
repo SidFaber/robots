@@ -29,7 +29,7 @@ class Motor:
     def reverse (self, speed = None):
         '''Spin the motor in revers'''
         if speed == None:
-            speed = -self._maxSpeed
+            speed = self._maxSpeed
         self.run (-1 * speed)
 
     def stop (self):
