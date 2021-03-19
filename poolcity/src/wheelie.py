@@ -84,7 +84,7 @@ class Wheelie (Node):
         self.speed = 0.0
         self.spin = 0.0
         self.close = 0.30  #start slowing down when this close
-        self.stop = 0.10   #no forward motion when this close
+        self.tooclose = 0.10   #no forward motion when this close
         self.distance = 0.0
 
         self._command_subscription = self.create_subscription(
@@ -225,10 +225,10 @@ class Wheelie (Node):
         # Add in a governor to cap forward motion when we're about
         # to collide with something (but still backwards motion)
         governor = 1.0
-        if self.distance < self.stop:
+        if self.distance < self.tooclose:
             governor = 0.0
         elif self.distance < self.close:
-            governor = (self.distance - self.stop) / (self.close - self.stop)
+            governor = (self.distance - self.tooclose) / (self.close - self.tooclose)
         if right_percentage > 0:
             right_percentage *= governor
         if left_percentage > 0:
